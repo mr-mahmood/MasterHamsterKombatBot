@@ -3,6 +3,7 @@
 # Github: https://github.com/masterking32
 
 import asyncio
+import multiprocessing
 import datetime
 import json
 import logging
@@ -1345,7 +1346,8 @@ class HamsterKombatAccount:
         if self.config["auto_finish_mini_game"]:
             log.info(f"[{self.account_name}] Attempting to finish mini game...")
             time.sleep(1)
-            self.StartMiniGame(AccountConfigData, AccountBasicData["accountInfo"]["id"])
+            for i in range(5):
+                self.StartMiniGame(AccountConfigData, AccountBasicData["accountInfo"]["id"])
 
         # Start tapping
         if self.config["auto_tap"]:
@@ -1560,34 +1562,31 @@ class HamsterKombatAccount:
         )
 
 
+def RunSingleAccount(account):
+    # Initialize the account (similar to your existing setup)
+    hamster_account = HamsterKombatAccount(account)
+    hamster_account.SendTelegramLog(
+        f"[{hamster_account.account_name}] Hamster Kombat Auto farming bot started successfully.",
+        "general_info",
+    )
+    # Start the account
+    hamster_account.Start()
+
 def RunAccounts():
-    accounts = []
-    for account in AccountList:
-        accounts.append(HamsterKombatAccount(account))
-        accounts[-1].SendTelegramLog(
-            f"[{accounts[-1].account_name}] Hamster Kombat Auto farming bot started successfully.",
-            "general_info",
-        )
-
     while True:
-        log.info("\033[1;33mStarting all accounts...\033[0m")
-        for account in accounts:
-            account.Start()
+        processes = []
+        for account in AccountList:
+            process = multiprocessing.Process(target=RunSingleAccount, args=(account,))
+            processes.append(process)
+            process.start()
 
-        if AccountsRecheckTime < 1 and MaxRandomDelay < 1:
-            log.error(
-                f"AccountsRecheckTime and MaxRandomDelay values are set to 0, bot will close now."
-            )
-            return
+        # Wait for all processes to finish
+        for process in processes:
+            process.join()
+        
+        log.error(f"Rechecking all accounts in {AccountsRecheckTime} seconds...")
+        time.sleep(AccountsRecheckTime)
 
-        if MaxRandomDelay > 0:
-            randomDelay = random.randint(1, MaxRandomDelay)
-            log.error(f"Sleeping for {randomDelay} seconds because of random delay...")
-            time.sleep(randomDelay)
-
-        if AccountsRecheckTime > 0:
-            log.error(f"Rechecking all accounts in {AccountsRecheckTime} seconds...")
-            time.sleep(AccountsRecheckTime)
 
 
 def main():
